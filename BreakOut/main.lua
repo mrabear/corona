@@ -23,7 +23,7 @@ local screenW, screenH = display.contentWidth, display.contentHeight
 ---------------
 -- BACKGROUND
 ---------------
-local background = display.newImage( "metal_bg.jpg", true )
+local background = display.newImage( "assets/images/metal_bg.jpg", true )
 background.x = screenW / 2
 background.y = screenH / 2
 background.label = "background"
@@ -72,8 +72,8 @@ ball:setLinearVelocity( -100, 300 )
 ---------------
 -- PADDLE
 ---------------
-local paddleSpriteData  = require( "paddleSpriteData" )
-local paddleSpriteSheet = sprite.newSpriteSheetFromData( "paddleReverse.png", paddleSpriteData.getSpriteSheetData() )
+local paddleSpriteData  = require( "assets/data/paddleSpriteData" )
+local paddleSpriteSheet = sprite.newSpriteSheetFromData( "assets/images/paddle.png", paddleSpriteData.getSpriteSheetData() )
 local paddleSpriteSet   = sprite.newSpriteSet( paddleSpriteSheet, 1, 9)
 local paddle = sprite.newSprite( paddleSpriteSet )
 sprite.add( paddleSpriteSet, "paddleHit", 1, 9, 75, 1 )
@@ -100,8 +100,8 @@ local blocks = {}
 local blockGutter = 50
 local blockGap = 10
 
-local blockSpriteData  = require( "blockSpriteData" )
-local blockSpriteSheet = sprite.newSpriteSheetFromData( "blockSpriteData.png", blockSpriteData.getSpriteSheetData() )
+local blockSpriteData  = require( "assets/data/blockSpriteData" )
+local blockSpriteSheet = sprite.newSpriteSheetFromData( "assets/images/blockSpriteData.png", blockSpriteData.getSpriteSheetData() )
 local blockSpriteSet   = sprite.newSpriteSet( blockSpriteSheet, 1, 9)
 
 ---------------
