@@ -1,4 +1,6 @@
 
+local sprite = require "sprite"
+
 ---------------
 -- PHYSICS SETUP
 ---------------
@@ -69,9 +71,15 @@ ball:setLinearVelocity( -100, 300 )
 ---------------
 -- PADDLE
 ---------------
-local paddle = display.newRoundedRect( 20, 420, 100, 30, 4 )
-paddle:setFillColor(255, 255, 255, 255)
-physics.addBody( paddle, "static", { density = 1.0, friction = 0, bounce = 0} )
+local paddleSpriteData = require( "paddleSpriteData" )
+local paddleSpriteSheet = sprite.newSpriteSheetFromData( "paddleReverse.png", paddleSpriteData.getSpriteSheetData() )
+local paddleSpriteSet   = sprite.newSpriteSet( paddleSpriteSheet, 1, 9)
+local paddle = sprite.newSprite( paddleSpriteSet )
+sprite.add( paddleSpriteSet, "paddleHit", 1, 9, 75, 1 )
+paddle:prepare( "paddleHit" )
+paddle.x = 100
+paddle.y = 420
+physics.addBody( paddle, "static", { density = 1.0, friction = 1, bounce = 0} )
 paddle.label = "paddle"
 
 ---------------
@@ -85,6 +93,15 @@ local blockGap = 10
 -- GAMEPLAY
 ---------------
 local ballInPlay = true
+
+-------------------------------------------
+-- Set a value to bounds
+-------------------------------------------
+local function clamp(value, low, high)
+    if value < low then value = low
+    elseif high and value > high then value = high end
+    return value
+end
 
 -- A general function for dragging objects
 local function handleTouch( event )
@@ -112,7 +129,7 @@ local function handleTouch( event )
 	elseif t.isFocus then
 		if "moved" == phase then
 			if t.label == "paddle" then
-				t.x = event.x - t.x0
+				paddle.x = clamp( event.x - t.x0, paddle.width / 2, screenW - paddle.width / 2 ) 
 			elseif t.label == "ball" then
 				ball.x = event.x
 				ball.y = event.y
@@ -163,7 +180,7 @@ local function loadBlocks( width, height )
 	
 	for blockX = 0, width - 1 do
 		for blockY = 0, height - 1 do
-			local block = display.newRoundedRect( blockGutter + blockX * ( blockWidth + blockGap ), blockGutter + blockY * ( blockHeight + blockGap ), 
+			local block = display.newRect( blockGutter + blockX * ( blockWidth + blockGap ), blockGutter + blockY * ( blockHeight + blockGap ), 
 												  blockWidth, blockHeight, 4 )
 			block:setFillColor(255, 0, 0, 255)
 			physics.addBody( block, "static", { density = 1.0, friction = 0, bounce = 0} )
@@ -184,7 +201,10 @@ end
 
 local function processBallCollision( self, event )
 
-	if event.phase == "ended" and event.other.label == "block" then
+	if event.phase == "began" and event.other.label == "paddle" then
+		paddle:prepare( "paddleHit" )
+		paddle:play()
+	elseif event.phase == "ended" and event.other.label == "block" then
 		--timer.performWithDelay( 500, removeBlock( event.other ), 0 )
 		table.remove( blocks, table.indexOf( blocks, event.other ) )
 		event.other:removeSelf()
@@ -195,7 +215,7 @@ end
 
 
 -- Load a random set of blocks
-loadBlocks( mRand( 3, 5 ), mRand( 2, 5 ) )
+loadBlocks( mRand( 3, 7 ), mRand( 2, 5 ) )
 
 ---------------
 -- EVENT LISTENERS
