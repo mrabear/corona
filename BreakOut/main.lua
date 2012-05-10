@@ -65,8 +65,8 @@ ball:setFillColor(255, 255, 255, 255)
 --ball.y = screenH * 0.2
 ball.label = "ball"
 
-physics.addBody( ball, { density = 1.0, friction = 0, 
-                         bounce = 1.01,  radius = ( ball.width / 2 ) } )
+physics.addBody( ball, { density = 0, friction = 0, bounce = 1.01,  radius = ( ball.width / 2 ) } )
+ball.isBullet = true
 ball:setLinearVelocity( -100, 300 )
 
 ---------------
@@ -76,21 +76,21 @@ local paddleSpriteData  = require( "assets/data/paddleSpriteData" )
 local paddleSpriteSheet = sprite.newSpriteSheetFromData( "assets/images/paddle.png", paddleSpriteData.getSpriteSheetData() )
 local paddleSpriteSet   = sprite.newSpriteSet( paddleSpriteSheet, 1, 9)
 local paddle = sprite.newSprite( paddleSpriteSet )
+paddle:setReferencePoint( display.TopLeftReferencePoint )
+paddle:scale( 0.9, 0.9 )
+
 sprite.add( paddleSpriteSet, "paddleHit", 1, 9, 75, 1 )
 paddle:prepare( "paddleHit" )
 paddle.x = 100
 paddle.y = 420
-paddle:scale( 0.9, 0.9 )
 
-local paddleShape = { -paddle.width / 2 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 12,
-					  -paddle.width / 3 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 6,
-					   0							   , -paddle.height / 2 * paddle.yScale,
-					   paddle.width / 3 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 6,
-					   paddle.width / 2 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 12,
-					   paddle.width / 2 * paddle.xScale,  paddle.height / 2 * paddle.yScale,
-					  -paddle.width / 2 * paddle.xScale,  paddle.height / 2 * paddle.yScale }
-					  
-physics.addBody( paddle, "static", { density = 0, friction = 0, bounce = 0, shape = paddleShape } )
+local paddleShape = { -paddle.width * 0.5 * paddle.xScale, -paddle.height * 0.5 * paddle.yScale + 8,
+					   0							     , -paddle.height * 0.5 * paddle.yScale,
+					   paddle.width * 0.5 * paddle.xScale, -paddle.height * 0.5 * paddle.yScale + 8,
+					   paddle.width * 0.5 * paddle.xScale,  paddle.height * 0.5 * paddle.yScale,
+					  -paddle.width * 0.5 * paddle.xScale,  paddle.height * 0.5 * paddle.yScale }
+
+physics.addBody( paddle, "kinematic", { density = 3, friction = 0, bounce = 0, shape = paddleShape } )
 paddle.label = "paddle"
 
 ---------------
@@ -144,7 +144,7 @@ local function handleTouch( event )
 	elseif t.isFocus then
 		if "moved" == phase then
 			if t.label == "paddle" then
-				paddle.x = clamp( event.x - t.x0, paddle.width / 2, screenW - paddle.width / 2 ) 
+				paddle.x = clamp( event.x - t.x0, 0, screenW - ( paddle.width * paddle.xScale ) ) 
 			elseif t.label == "ball" then
 				ball.x = event.x
 				ball.y = event.y
@@ -228,7 +228,7 @@ local function loadBlocks( width, height )
 			block.x = blockGutter + blockX * ( blockWidth + blockGap )
 			block.y = blockGutter + blockY * ( blockHeight + blockGap )
 
-			physics.addBody( block, "static", { density = 1.0, friction = 0, bounce = 0, shape = blockShape } )
+			physics.addBody( block, "kinematic", { density = 1.0, friction = 0, bounce = 0, shape = blockShape } )
 			block.label = "block"
 			--block.index = #blocks + 1
 			blocks[ #blocks + 1 ] = block
@@ -247,13 +247,15 @@ local function processBallCollision( self, event )
 		elseif event.other.label == "block" then
 			event.other:play()
 		end
-	elseif event.phase == "ended" and event.other.label == "block" then
-		--timer.performWithDelay( 10, disableBlock( event.other ) , 0 )
-		--table.remove( blocks, table.indexOf( blocks, event.other ) )
-		--event.other:removeSelf()
-		--print( "block removed (" .. #blocks .. " blocks left)" )
+	elseif event.phase == "ended" then
+		if event.other.label == "block" then
+			local disableBlock = function()
+				event.other.isBodyActive = false
+			end
+			
+			timer.performWithDelay( 1, disableBlock , 1 )
+		end		
 	end
-
 end
 
 
