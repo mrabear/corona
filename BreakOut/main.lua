@@ -8,6 +8,7 @@ local physics = require "physics"
 
 physics.start()
 physics.setGravity( 0, 0 )
+--physics.setDrawMode( "hybrid" )
 
 ---------------
 -- RNG
@@ -71,7 +72,7 @@ ball:setLinearVelocity( -100, 300 )
 ---------------
 -- PADDLE
 ---------------
-local paddleSpriteData = require( "paddleSpriteData" )
+local paddleSpriteData  = require( "paddleSpriteData" )
 local paddleSpriteSheet = sprite.newSpriteSheetFromData( "paddleReverse.png", paddleSpriteData.getSpriteSheetData() )
 local paddleSpriteSet   = sprite.newSpriteSet( paddleSpriteSheet, 1, 9)
 local paddle = sprite.newSprite( paddleSpriteSet )
@@ -79,7 +80,17 @@ sprite.add( paddleSpriteSet, "paddleHit", 1, 9, 75, 1 )
 paddle:prepare( "paddleHit" )
 paddle.x = 100
 paddle.y = 420
-physics.addBody( paddle, "static", { density = 1.0, friction = 1, bounce = 0} )
+paddle:scale( 0.9, 0.9 )
+
+local paddleShape = { -paddle.width / 2 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 12,
+					  -paddle.width / 3 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 6,
+					   0							   , -paddle.height / 2 * paddle.yScale,
+					   paddle.width / 3 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 6,
+					   paddle.width / 2 * paddle.xScale, -paddle.height / 2 * paddle.yScale + 12,
+					   paddle.width / 2 * paddle.xScale,  paddle.height / 2 * paddle.yScale,
+					  -paddle.width / 2 * paddle.xScale,  paddle.height / 2 * paddle.yScale }
+					  
+physics.addBody( paddle, "static", { density = 0, friction = 0, bounce = 0, shape = paddleShape } )
 paddle.label = "paddle"
 
 ---------------
@@ -88,6 +99,10 @@ paddle.label = "paddle"
 local blocks = {}
 local blockGutter = 50
 local blockGap = 10
+
+local blockSpriteData  = require( "blockSpriteData" )
+local blockSpriteSheet = sprite.newSpriteSheetFromData( "blockSpriteData.png", blockSpriteData.getSpriteSheetData() )
+local blockSpriteSet   = sprite.newSpriteSet( blockSpriteSheet, 1, 9)
 
 ---------------
 -- GAMEPLAY
@@ -169,46 +184,74 @@ local function ballLost( self, event )
 	
 end
 
+local function processBlockHit( event )
+	if event.phase == "end" then
+		table.remove( blocks, table.indexOf( blocks, event.sprite ) )
+		event.sprite:removeSelf()
+		print( "block removed (" .. #blocks .. " blocks left)" )
+	end
+end
+
 -- Load a grid of blocks
 local function loadBlocks( width, height )
 
-	
+	print( "Building new " .. width .. "x" .. height .. " level" )
+
 	local blockWidth = ( screenW - ( blockGutter * 2 ) - ( blockGap * ( width - 1 ) ) ) / width
 	local blockHeight = 20
+	local blockXscale = blockWidth / 40
+	
+	print( "width=" .. blockWidth )
+	print( "height=" .. blockHeight )
+	print( "blockXscale=" .. blockXscale )
+	
+	local blockShape = { -blockWidth * 0.5, -blockHeight * 0.5,
+						  blockWidth * 0.5, -blockHeight * 0.5,
+						  blockWidth * 0.5,  blockHeight * 0.5,
+						 -blockWidth * 0.5,  blockHeight * 0.5 }
+
 	
 	--blocks = {}
 	
 	for blockX = 0, width - 1 do
 		for blockY = 0, height - 1 do
-			local block = display.newRect( blockGutter + blockX * ( blockWidth + blockGap ), blockGutter + blockY * ( blockHeight + blockGap ), 
-												  blockWidth, blockHeight, 4 )
-			block:setFillColor(255, 0, 0, 255)
-			physics.addBody( block, "static", { density = 1.0, friction = 0, bounce = 0} )
+			--local blockz = display.newRect( blockGutter + blockX * ( blockWidth + blockGap ), blockGutter + blockY * ( blockHeight + blockGap ), 
+			--							   blockWidth, blockHeight, 4 )
+			--blockz:setFillColor(0, 0, 255, 150)
+			
+			local block = sprite.newSprite( blockSpriteSet )
+			block:scale( blockXscale, 1 )
+			block:setReferencePoint( display.TopLeftReferencePoint )
+			
+			sprite.add( blockSpriteSet, "blockHit", 1, 8, 10, 1 )
+			block:prepare( "blockHit" )
+			block.x = blockGutter + blockX * ( blockWidth + blockGap )
+			block.y = blockGutter + blockY * ( blockHeight + blockGap )
+
+			physics.addBody( block, "static", { density = 1.0, friction = 0, bounce = 0, shape = blockShape } )
 			block.label = "block"
 			--block.index = #blocks + 1
 			blocks[ #blocks + 1 ] = block
+			
+			block:addEventListener( "sprite", processBlockHit )
 		end
-	end
-
-	
+	end	
 end
-
---local function removeBlock( block )
---		table.remove( blocks, table.indexOf( blocks, block ) )
---		block:removeSelf()
---		print( "block removed (" .. #blocks .. " blocks left)" )
---end
 
 local function processBallCollision( self, event )
 
-	if event.phase == "began" and event.other.label == "paddle" then
-		paddle:prepare( "paddleHit" )
-		paddle:play()
+	if event.phase == "began" then
+		if event.other.label == "paddle" then
+			paddle:prepare( "paddleHit" )
+			paddle:play()
+		elseif event.other.label == "block" then
+			event.other:play()
+		end
 	elseif event.phase == "ended" and event.other.label == "block" then
-		--timer.performWithDelay( 500, removeBlock( event.other ), 0 )
-		table.remove( blocks, table.indexOf( blocks, event.other ) )
-		event.other:removeSelf()
-		print( "block removed (" .. #blocks .. " blocks left)" )
+		--timer.performWithDelay( 10, disableBlock( event.other ) , 0 )
+		--table.remove( blocks, table.indexOf( blocks, event.other ) )
+		--event.other:removeSelf()
+		--print( "block removed (" .. #blocks .. " blocks left)" )
 	end
 
 end
@@ -226,4 +269,5 @@ borderBottom:addEventListener("collision", borderBottom )
 ball.collision = processBallCollision
 ball:addEventListener("collision", ball )
 
+paddle.collision = processCollision
 paddle:addEventListener( "touch", handleTouch )
