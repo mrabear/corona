@@ -37,16 +37,19 @@ borderBody = { density = 1.0, friction=0, bounce=0 }
 local borderLeft = display.newRect( 0, 1, 1, 480 )
 borderLeft:setFillColor(255, 255, 255, 0)
 physics.addBody( borderLeft, "static",  borderBody )
+borderLeft.label = "border"
  
 -- Right border that the ball bounces off of
 local borderRight = display.newRect( 319, 1, 1, 480 )
 borderRight:setFillColor(255, 255, 255, 0)
 physics.addBody( borderRight, "static",  borderBody )
+borderRight.label = "border"
 
 -- Top border that the ball bounces off of
 local borderTop = display.newRect( 0, 0, 320, 1 )
 borderTop:setFillColor(255, 255, 255, 0)
 physics.addBody( borderTop, "static",  borderBody )
+borderTop.label = "border"
  
 -- Bottom sensor that lights up when the ball passes it
 local borderBottom = display.newRect( 0, 479, 320, 5 )
@@ -109,6 +112,17 @@ local blockSpriteSet   = sprite.newSpriteSet( blockSpriteSheet, 1, 9)
 ---------------
 local ballInPlay = true
 
+---------------
+-- SOUND
+---------------
+local blockBreakSound = audio.loadSound( "assets/sound/blockBreak.wav"  )
+local ballBounceSound = audio.loadSound( "assets/sound/ballBounce1.wav" )
+local ballLostSound   = audio.loadSound( "assets/sound/ballLost.wav"    )
+
+audio.setVolume( 0.5, { channel = 1 } )
+audio.setVolume( 0.35, { channel = 2 } )
+audio.setVolume( 1, { channel = 3 } )
+
 -------------------------------------------
 -- Set a value to bounds
 -------------------------------------------
@@ -145,6 +159,11 @@ local function handleTouch( event )
 		if "moved" == phase then
 			if t.label == "paddle" then
 				paddle.x = clamp( event.x - t.x0, 0, screenW - ( paddle.width * paddle.xScale ) ) 
+				
+				-- Move the paddle offset if the player keeps dragging past the edge of the screen
+				if paddle.x ~= event.x - t.x0 and clamp( event.x, 0, screenW ) == event.x then
+					t.x0 = event.x - t.x
+				end
 			elseif t.label == "ball" then
 				ball.x = event.x
 				ball.y = event.y
@@ -167,25 +186,23 @@ local function handleTouch( event )
 	return true
 end		
 
--- If the ball falls through the bottom of the screen
-local function ballLost( self, event )
+-- Destroy the given ball
+local function ballLost( targetBall )
 
-	if event.phase == "began" then
-		-- Start listening for touching anywhere on the background (to reset the ball)
-		ball:addEventListener( "touch",handleTouch )
-		background:addEventListener("touch",handleTouch )
-
-		ballInPlay = false
-		
-		print( "ball lost!" )
-	elseif event.phase == "ended" then
-		ball:setLinearVelocity( 0, 0 )
-	end
+	-- Start listening for touching anywhere on the background (to reset the ball)
+	targetBall:addEventListener( "touch",handleTouch )
+	background:addEventListener("touch",handleTouch )
+	ballInPlay = false
+	
+	audio.play( ballLostSound )
+	
+	targetBall:setLinearVelocity( 0, 0 )
+	print( "ball lost!" )
 	
 end
 
-local function processBlockHit( event )
-	if event.phase == "end" then
+local function processAnimation( event )
+	if event.phase == "end" and event.sprite.label == "block" then
 		table.remove( blocks, table.indexOf( blocks, event.sprite ) )
 		event.sprite:removeSelf()
 		print( "block removed (" .. #blocks .. " blocks left)" )
@@ -201,10 +218,6 @@ local function loadBlocks( width, height )
 	local blockHeight = 20
 	local blockXscale = blockWidth / 40
 	
-	print( "width=" .. blockWidth )
-	print( "height=" .. blockHeight )
-	print( "blockXscale=" .. blockXscale )
-	
 	local blockShape = { -blockWidth * 0.5, -blockHeight * 0.5,
 						  blockWidth * 0.5, -blockHeight * 0.5,
 						  blockWidth * 0.5,  blockHeight * 0.5,
@@ -215,45 +228,54 @@ local function loadBlocks( width, height )
 	
 	for blockX = 0, width - 1 do
 		for blockY = 0, height - 1 do
-			--local blockz = display.newRect( blockGutter + blockX * ( blockWidth + blockGap ), blockGutter + blockY * ( blockHeight + blockGap ), 
-			--							   blockWidth, blockHeight, 4 )
-			--blockz:setFillColor(0, 0, 255, 150)
 			
 			local block = sprite.newSprite( blockSpriteSet )
 			block:scale( blockXscale, 1 )
 			block:setReferencePoint( display.TopLeftReferencePoint )
 			
-			sprite.add( blockSpriteSet, "blockHit", 1, 8, 10, 1 )
+			sprite.add( blockSpriteSet, "blockHit", 1, 9, 10, 1 )
 			block:prepare( "blockHit" )
 			block.x = blockGutter + blockX * ( blockWidth + blockGap )
 			block.y = blockGutter + blockY * ( blockHeight + blockGap )
 
 			physics.addBody( block, "kinematic", { density = 1.0, friction = 0, bounce = 0, shape = blockShape } )
 			block.label = "block"
-			--block.index = #blocks + 1
 			blocks[ #blocks + 1 ] = block
 			
-			block:addEventListener( "sprite", processBlockHit )
+			block:addEventListener( "sprite", processAnimation )
 		end
 	end	
 end
 
+-- Process the ball collisions
 local function processBallCollision( self, event )
 
 	if event.phase == "began" then
+		-- If the ball collides with the paddle, animate the paddle
 		if event.other.label == "paddle" then
 			paddle:prepare( "paddleHit" )
 			paddle:play()
+			audio.play( ballBounceSound )
+		-- If the ball collides with a block, start the destroy animation
 		elseif event.other.label == "block" then
 			event.other:play()
+			audio.play( blockBreakSound )
+		-- If the ball collides with a border, play a bounce sound
+		elseif event.other.label == "border" then
+			audio.play( ballBounceSound )
 		end
 	elseif event.phase == "ended" then
+		-- If a block collision is over, disable the block
 		if event.other.label == "block" then
 			local disableBlock = function()
 				event.other.isBodyActive = false
 			end
 			
 			timer.performWithDelay( 1, disableBlock , 1 )
+		
+		-- If the ball has passed through the floor, destroy it
+		elseif event.other.label == "borderBottom" then
+			ballLost( self )
 		end		
 	end
 end
@@ -265,9 +287,6 @@ loadBlocks( mRand( 3, 7 ), mRand( 2, 5 ) )
 ---------------
 -- EVENT LISTENERS
 ---------------
-borderBottom.collision = ballLost
-borderBottom:addEventListener("collision", borderBottom )
-
 ball.collision = processBallCollision
 ball:addEventListener("collision", ball )
 

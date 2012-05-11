@@ -82,8 +82,8 @@ SpriteSheet.getSpriteSheetData = function ()
 			},
 			{
 				name = "Untitled-10008.png",
-				spriteColorRect = { x = 0, y = 0, width = 0, height = 0 },
-				textureRect = { x = 86, y = 46, width = 0, height = 0 },
+				spriteColorRect = { x = 0, y = 0, width = 40, height = 20 },
+				textureRect = { x = 86, y = 46, width = 40, height = 20 },
 				spriteSourceSize = { width = 40, height = 20 },
 				spriteTrimmed = false,
 				textureRotated = false
